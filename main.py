@@ -8,7 +8,7 @@ from sqlalchemy.orm import sessionmaker,declarative_base
 from typing import Generator
 from users.schemas import CreateUserRequest
 from sqlalchemy.orm import Session
-from users.services import create_user_account
+from users.services import create_user_account,login_user_account
 
 
 
@@ -39,6 +39,14 @@ async def create_user(data: CreateUserRequest, db : Session = Depends(get_db) ):
      await create_user_account(data=data, db=db)
      payload = {"message":"User created successfully"}
      return JSONResponse(content=payload)
+ 
+@app.post("/login",status_code=status.HTTP_201_CREATED)
+async def login_user(data:CreateUserRequest,db : Session = Depends(get_db)):
+    access_token =  await login_user_account(data=data,db=db)
+    payload =  {"message":"User login successfully",
+                "access_totken":access_token
+                 }
+    return JSONResponse(content = payload)
 
 @app.get('/')
 def health_check():
