@@ -1,19 +1,17 @@
 from users.models import UserModel
 from fastapi.exceptions import  HTTPException
-from passlib.context import CryptContext
-from datetime import datetime, timedelta, timezone
-from typing import Annotated, Union
-import jwt
-from pydantic import BaseModel
+from starlette.authentication import AuthCredentials, UnauthenticatedUser
+from core.security import get_password_hash
+from jose import jwt, JWTError
+from core.database import get_db
+from fastapi import Depends
+from core.config import get_settings
+from fastapi.security import OAuth2PasswordBearer
 
 
 
-# to get a string like this run:
-# openssl rand -hex 32
-SECRET_KEY = "83233c855f2e1d6fcca0e745e13e3aa8174ccdc40e0d6be05aa69b5ca25508da"
-ALGORITHM = "HS256"
-
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
+settings = get_settings()
 
 async def create_user_account(data,db):
     user = db.query(UserModel).filter(UserModel.email == data.email).first()
@@ -31,44 +29,49 @@ async def create_user_account(data,db):
     db.commit()
     db.refresh(new_user)
     return new_user
-    
-    
-class Token(BaseModel):
-    access_token: str
-    token_type: str
 
-    
-async def login_user_account(data,db):
-    user = authenticate_user(data=data,db=db)
-    if not user:
-        raise HTTPException(status_code=401, detail="UNAUTHORIZED: Incorrect user name or password")
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(data={"sub": user.first_name},expires_delta=access_token_expires)
-    return access_token
+def get_token_payload(token):
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+    except JWTError:
+        return None
+    return payload
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+def get_current_user(token: str = Depends(oauth2_scheme), db = None):
+    payload = get_token_payload(token)
+    if not payload or type(payload) is not dict:
+        return None
 
-def authenticate_user(data,db):
-    user = db.query(UserModel).filter(UserModel.email == data.email).first()
-    if not user:
-        return False
-    if not verify_password(data.password, user.password):
-        return False
+    user_name = payload.get('sub', None)
+    if not user_name:
+        return None
+
+    if not db:
+        db = next(get_db())
+
+    user = db.query(UserModel).filter(UserModel.first_name == user_name).first()
     return user
+    
+class JWTAuth:
+    
+    async def authenticate(self, conn):
+        guest = AuthCredentials(['unauthenticated']), UnauthenticatedUser()
+        if 'authorization' not in conn.headers:
+            return guest
+        
+        token = conn.headers.get('authorization').split(' ')[1]  # Bearer token_hash
+        if not token:
+            return guest
+        
+        user = get_current_user(token=token)
+        
+        if not user:
+            return guest
+        
+        return AuthCredentials('authenticated'), user
 
-def get_password_hash(password):
-    return pwd_context.hash(password)
+    
 
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
 
-def create_access_token(data: dict, expires_delta: Union[timedelta, None] = None):
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+
 

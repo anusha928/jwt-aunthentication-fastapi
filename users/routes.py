@@ -1,17 +1,26 @@
-from fastapi import APIRouter, status,Depends
+from fastapi import APIRouter, status,Depends,Request
 from sqlalchemy.orm import Session
-from main import get_db
+from core.database import get_db
 from users.schemas import CreateUserRequest
 from users.services import create_user_account
 from fastapi.responses import JSONResponse
+from users.services import oauth2_scheme
+from users.response import UserResponse;
+from starlette.authentication import UnauthenticatedUser
+from fastapi import HTTPException, status
 
 router = APIRouter(
-    prefix = "/users",
+    prefix = "/user",
     tags = ["Users"],
     responses = {404: {"description": "Not Found"}},
 )
-print(router)
 
+user_router = APIRouter(
+    prefix = "/user",
+    tags = ["Users"],
+    responses = {404: {"description": "Not Found"}},
+    dependencies=[Depends(oauth2_scheme)]
+)
 
 @router.post('',status_code=status.HTTP_201_CREATED)
 async def create_user(data: CreateUserRequest, db : Session = Depends(get_db) ):
@@ -19,5 +28,15 @@ async def create_user(data: CreateUserRequest, db : Session = Depends(get_db) ):
      payload = {"message":"User created successfully"}
      return JSONResponse(content=payload)
     
-
- 
+@user_router.post('/me', status_code=status.HTTP_200_OK, response_model=UserResponse)
+def get_user(request: Request):
+    return request.user
+# @user_router.get('/get_user',status_code=status.HTTP_200_OK,response_model= UserResponse)
+# async def get_user(request:Request):
+#     user =  request.user
+#     if isinstance(user, UnauthenticatedUser):
+#         raise HTTPException(
+#             status_code=status.HTTP_401_UNAUTHORIZED,
+#             detail="User is not authenticated"
+#         )
+#     return user
