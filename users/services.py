@@ -7,6 +7,8 @@ from core.database import get_db
 from fastapi import Depends
 from core.config import get_settings
 from fastapi.security import OAuth2PasswordBearer
+from datetime import datetime, timezone
+
 
 
 
@@ -32,10 +34,23 @@ async def create_user_account(data,db):
 
 def get_token_payload(token):
     try:
+        # Decode the token
         payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
-    except JWTError:
-        return None
+    except JWTError as e:
+        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
+    
+    # Check expiration
+    exp = payload.get("exp")
+    if exp:
+        expire_time = datetime.fromtimestamp(exp, tz=timezone.utc)
+        if expire_time < datetime.now(timezone.utc):
+            raise HTTPException(status_code=401, detail="Access token has expired")
+    else:
+        raise HTTPException(status_code=401, detail="Token does not contain an expiration time")
+
     return payload
+
+
 
 def get_current_user(token: str = Depends(oauth2_scheme), db = None):
     payload = get_token_payload(token)
@@ -56,13 +71,17 @@ class JWTAuth:
     
     async def authenticate(self, conn):
         guest = AuthCredentials(['unauthenticated']), UnauthenticatedUser()
+        print(conn.headers)
         if 'authorization' not in conn.headers:
             return guest
-        
-        token = conn.headers.get('authorization').split(' ')[1]  # Bearer token_hash
+        auth_header = conn.headers.get('authorization')
+        if not auth_header.startswith('Bearer '):
+           print(f"Invalid Authorization header format: {auth_header}")
+           return guest
+        token = auth_header.split(' ')[1]
+        print(f"tokenn:  token")
         if not token:
             return guest
-        
         user = get_current_user(token=token)
         
         if not user:

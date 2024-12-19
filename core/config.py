@@ -17,9 +17,13 @@ class Settings(BaseSettings):
     DATABASE_URL :str = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
      # JWT 
-    JWT_SECRET: str = os.getenv('JWT_SECRET', '83233c855f2e1d6fcca0e745e13e3aa8174ccdc40e0d6be05aa69b5ca25508da')
+    JWT_SECRET: str = os.getenv('JWT_SECRET', '88cc41eb5898b6c7ca090a895e8f8f382e643431c6c4f2519c7f0da413284726')
+    REFRESH_SECRET: str = os.getenv('REFRESH_SECRET', '88cc41eb5898b6c7ca090a895e8f8f382e643431c6c4f2519c7f0da413284726')
     JWT_ALGORITHM: str = os.getenv('JWT_ALGORITHM', "HS256")
+    REFRESH_ALGORITHM: str = os.getenv('JWT_ALGORITHM', "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = os.getenv('JWT_TOKEN_EXPIRE_MINUTES', 60)
+    REFRESH_TOKEN_EXPIRE_DAY: int = os.getenv('REFRESH_TOKEN_EXPIRE_DAY', 7)
+
     
 def get_settings()-> Settings:
     return Settings()

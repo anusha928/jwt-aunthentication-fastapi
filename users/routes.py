@@ -31,12 +31,4 @@ async def create_user(data: CreateUserRequest, db : Session = Depends(get_db) ):
 @user_router.post('/me', status_code=status.HTTP_200_OK, response_model=UserResponse)
 def get_user(request: Request):
     return request.user
-# @user_router.get('/get_user',status_code=status.HTTP_200_OK,response_model= UserResponse)
-# async def get_user(request:Request):
-#     user =  request.user
-#     if isinstance(user, UnauthenticatedUser):
-#         raise HTTPException(
-#             status_code=status.HTTP_401_UNAUTHORIZED,
-#             detail="User is not authenticated"
-#         )
-#     return user
+
